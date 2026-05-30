@@ -112,13 +112,14 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+          git pull --rebase origin "${{ github.ref_name }}"
+
           git add "last_release_${REPO_TYPE}_tag.txt"
 
           # Only commit if there is an actual change
           if git diff --staged --quiet; then
             echo "Tag file unchanged — nothing to commit"
           else
-            git pull --rebase origin "${{ github.ref_name }}"
             git commit -m "chore(release): update ${REPO_TYPE} tag to ${UPSTREAM_TAG} [skip ci]"
             git push origin "${{ github.ref_name }}"
           fi
