@@ -1,0 +1,124 @@
+name: Auto-Generate PIF JSON Files
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+    inputs:
+      force_check:
+        description: "Force check even if tag is unchanged"
+        required: false
+        default: "false"
+        type: choice
+        options: ["true", "false"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pif-generator
+  cancel-in-progress: false
+
+# ---------------------------------------------------------------------------
+# Job 1 — Detect new upstream releases
+# ---------------------------------------------------------------------------
+jobs:
+  check-releases:
+    name: Check for New Releases
+    runs-on: ubuntu-latest
+    outputs:
+      new_release: ${{ steps.check.outputs.new_release }}
+      results: ${{ steps.check.outputs.results }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check upstream releases
+        id: check
+        run: python scripts/check_releases.py
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PYTHONPATH: .
+
+# ---------------------------------------------------------------------------
+# Job 2 — Generate & publish (runs once per new release, sequentially)
+# ---------------------------------------------------------------------------
+  generate-and-publish:
+    name: "Generate & Publish (${{ matrix.result.repo_type }})"
+    needs: check-releases
+    if: needs.check-releases.outputs.new_release == 'true'
+    runs-on: ubuntu-latest
+
+    strategy:
+      max-parallel: 1          # Sequential to avoid git-push race conditions
+      fail-fast: false
+      matrix:
+        result: ${{ fromJson(needs.check-releases.outputs.results) }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch full history so we can push commits cleanly
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # ---- Generate ----------------------------------------------------------
+      - name: Generate PIF JSON files
+        env:
+          PYTHONPATH: .
+          ASSETS_JSON: ${{ toJson(matrix.result.assets) }}
+          REPO_TYPE: ${{ matrix.result.repo_type }}
+        run: python scripts/generate_pifs.py "$ASSETS_JSON" "$REPO_TYPE"
+
+      # ---- Publish -----------------------------------------------------------
+      - name: Publish GitHub release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO_TYPE: ${{ matrix.result.repo_type }}
+          UPSTREAM_TAG: ${{ matrix.result.latest_tag }}
+        run: |
+          python scripts/publish_release.py \
+            "${{ github.repository }}" \
+            "$UPSTREAM_TAG" \
+            "$REPO_TYPE"
+
+      # ---- Update state ------------------------------------------------------
+      - name: Commit updated release-tag file
+        env:
+          REPO_TYPE: ${{ matrix.result.repo_type }}
+          UPSTREAM_TAG: ${{ matrix.result.latest_tag }}
+        run: |
+          echo "$UPSTREAM_TAG" > "last_release_${REPO_TYPE}_tag.txt"
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add "last_release_${REPO_TYPE}_tag.txt"
+
+          # Only commit if there is an actual change
+          if git diff --staged --quiet; then
+            echo "Tag file unchanged — nothing to commit"
+          else
+            git pull --rebase origin "${{ github.ref_name }}"
+            git commit -m "chore(release): update ${REPO_TYPE} tag to ${UPSTREAM_TAG} [skip ci]"
+            git push origin "${{ github.ref_name }}"
+          fi

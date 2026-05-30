@@ -1,94 +1,105 @@
 #!/usr/bin/env python3
-"""
-Check for new releases from monitored repositories
-"""
+
+from __future__ import annotations
+
+import json
+import logging
 import os
 import sys
-import json
-from github import Github, Auth
 from pathlib import Path
 
+from github import Auth, Github, GithubException
 
-REPOS = [
-    {"owner": "Pixel-Props", "name": "build.prop", "type": "stable"},
-    {"owner": "Elcapitanoe", "name": "Build-Prop-BETA", "type": "experimental"}
-]
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from src.pif_generator.constants import MONITORED_REPOS
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s  %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 
-def check_releases(github_token):
-    """Check all repos for new releases"""
-    auth = Auth.Token(github_token)
-    g = Github(auth=auth)
-    
-    results = []
-    
-    for repo_config in REPOS:
+def _read_last_tag(repo_type: str) -> str:
+    tag_file = Path(f"last_release_{repo_type}_tag.txt")
+    return tag_file.read_text(encoding="utf-8").strip() if tag_file.exists() else ""
+
+
+def _write_github_output(key: str, value: str) -> None:
+    gh_output = os.environ.get("GITHUB_OUTPUT")
+    if gh_output:
+        with open(gh_output, "a", encoding="utf-8") as fh:
+            fh.write(f"{key}={value}\n")
+
+
+def check_releases(github_token: str) -> dict:
+    client = Github(auth=Auth.Token(github_token))
+    new_results: list[dict] = []
+
+    for repo_config in MONITORED_REPOS:
+        repo_slug = f"{repo_config['owner']}/{repo_config['name']}"
+        repo_type = repo_config["type"]
+
         try:
-            repo = g.get_repo(f"{repo_config['owner']}/{repo_config['name']}")
-            
-            try:
-                latest = repo.get_latest_release()
-            except:
-                print(f"[WARN] No releases for {repo.full_name}")
-                continue
-            
-            tag = latest.tag_name
-            tag_file = Path(f"last_release_{repo_config['type']}_tag.txt")
-            
-            # Check if new
-            if tag_file.exists() and tag_file.read_text().strip() == tag:
-                print(f"[INFO] {repo.full_name} @ {tag} - Already processed")
-                continue
-            
-            # Get ALL ZIP assets
-            assets = []
-            for asset in latest.get_assets():
-                if asset.name.endswith('.zip'):
-                    assets.append({
-                        "name": asset.name,
-                        "url": asset.browser_download_url
-                    })
-            
-            if not assets:
-                print(f"[WARN] No ZIP assets in {tag}")
-                continue
-            
-            print(f"[NEW] {repo.full_name} @ {tag} - {len(assets)} assets")
-            
-            results.append({
-                "repo_type": repo_config['type'],
-                "latest_tag": tag,
-                "assets": assets,
-                "count": len(assets)
-            })
-        
-        except Exception as e:
-            print(f"[ERROR] {repo_config['owner']}/{repo_config['name']}: {e}")
+            repo = client.get_repo(repo_slug)
+        except GithubException as exc:
+            logger.error("Could not access repo %s: %s", repo_slug, exc)
             continue
-    
-    # Output results
-    if results:
-        if "GITHUB_OUTPUT" in os.environ:
-            with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-                f.write(f"new_release=true\n")
-                f.write(f"results={json.dumps(results)}\n")
-        
-        print(f"\n[SUMMARY] Found {len(results)} new release(s)")
-        return {"new_release": True, "results": results}
-    else:
-        print("[INFO] No new releases")
-        if "GITHUB_OUTPUT" in os.environ:
-            with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-                f.write("new_release=false\n")
-        
-        return {"new_release": False}
+
+        try:
+            latest_release = repo.get_latest_release()
+        except GithubException:
+            logger.warning("No published releases found for %s", repo_slug)
+            continue
+
+        tag = latest_release.tag_name
+        last_processed_tag = _read_last_tag(repo_type)
+
+        if last_processed_tag == tag:
+            logger.info("%s @ %s — already processed, skipping", repo_slug, tag)
+            continue
+
+        zip_assets = [
+            {"name": asset.name, "url": asset.browser_download_url}
+            for asset in latest_release.get_assets()
+            if asset.name.endswith(".zip")
+        ]
+
+        if not zip_assets:
+            logger.warning("%s @ %s — no ZIP assets found, skipping", repo_slug, tag)
+            continue
+
+        logger.info("[NEW] %s @ %s — %d asset(s)", repo_slug, tag, len(zip_assets))
+        new_results.append(
+            {
+                "repo_type":  repo_type,
+                "latest_tag": tag,
+                "assets":     zip_assets,
+                "count":      len(zip_assets),
+            }
+        )
+
+    if new_results:
+        logger.info("Found %d new release(s)", len(new_results))
+        _write_github_output("new_release", "true")
+        _write_github_output("results", json.dumps(new_results))
+        return {"new_release": True, "results": new_results}
+
+    logger.info("No new releases detected")
+    _write_github_output("new_release", "false")
+    return {"new_release": False, "results": []}
+
+
+def main() -> None:
+    token = os.environ.get("GITHUB_TOKEN")
+    if not token:
+        logger.error("GITHUB_TOKEN environment variable is not set")
+        sys.exit(1)
+
+    result = check_releases(token)
+    print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":
-    token = os.getenv("GITHUB_TOKEN")
-    if not token:
-        print("[ERROR] GITHUB_TOKEN not set")
-        sys.exit(1)
-    
-    result = check_releases(token)
-    print(json.dumps(result, indent=2))
+    main()
