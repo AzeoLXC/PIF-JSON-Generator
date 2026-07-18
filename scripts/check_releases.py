@@ -33,7 +33,7 @@ def _write_github_output(key: str, value: str) -> None:
             fh.write(f"{key}={value}\n")
 
 
-def check_releases(github_token: str) -> dict:
+def check_releases(github_token: str, force: bool = False) -> dict:
     client = Github(auth=Auth.Token(github_token))
     new_results: list[dict] = []
 
@@ -56,7 +56,7 @@ def check_releases(github_token: str) -> dict:
         tag = latest_release.tag_name
         last_processed_tag = _read_last_tag(repo_type)
 
-        if last_processed_tag == tag:
+        if not force and last_processed_tag == tag:
             logger.info("%s @ %s — already processed, skipping", repo_slug, tag)
             continue
 
@@ -97,7 +97,8 @@ def main() -> None:
         logger.error("GITHUB_TOKEN environment variable is not set")
         sys.exit(1)
 
-    result = check_releases(token)
+    force = os.environ.get("FORCE_CHECK", "false").lower() == "true"
+    result = check_releases(token, force=force)
     print(json.dumps(result, indent=2))
 
 
