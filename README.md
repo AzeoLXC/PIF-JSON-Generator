@@ -1,5 +1,7 @@
 # PIF JSON Generator
 
+[![Live Dashboard](https://img.shields.io/badge/Live%20Dashboard-GitHub%20Pages-blue?style=for-the-badge&logo=githubpages&logoColor=white)](https://azeolxc.github.io/PIF-JSON-Generator/)
+
 [![CI Checks & Tests](https://github.com/AzeoLXC/PIF-JSON-Generator/actions/workflows/ci.yml/badge.svg)](https://github.com/AzeoLXC/PIF-JSON-Generator/actions/workflows/ci.yml)
 [![Auto-Generate PIF JSON Files](https://github.com/AzeoLXC/PIF-JSON-Generator/actions/workflows/auto_generate.yml/badge.svg)](https://github.com/AzeoLXC/PIF-JSON-Generator/actions/workflows/auto_generate.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
@@ -8,10 +10,14 @@
 
 Automated, resilient generator for **Play Integrity Fix (PIF) JSON** configuration files parsed directly from Android `system.prop` releases. Built with native retry backoffs, strict field validation, and automated CI/CD lifecycle workflows.
 
+🌐 **Direct Access Live Dashboard:**  
+👉 **[https://azeolxc.github.io/PIF-JSON-Generator/](https://azeolxc.github.io/PIF-JSON-Generator/)**
+
 ---
 
 ## Key Highlights
 
+- 🌐 **Live Web Dashboard:** Real-time web explorer to browse and download PIF JSON configurations for both Stable and Experimental channels.
 - 🛡️ **Resilient Network Adapter:** Engineered with `urllib3.util.Retry` exponential backoff (automatic recovery on `429`, `500`, `502`, `503`, and `504` HTTP status codes).
 - ⚙️ **Dual Output Architectures:**
   - `extended` *(default)* — 19-field modern format with granular spoofing flags.
@@ -29,6 +35,7 @@ PIF-JSON-Generator/
 ├── .github/
 │   └── workflows/
 │       ├── ci.yml                 # CI: Ruff linter & Pytest suite
+│       ├── pages.yml              # Deployment: GitHub Pages release dashboard
 │       └── auto_generate.yml      # CD: Upstream watcher & release publisher
 ├── src/
 │   └── pif_generator/
@@ -42,6 +49,7 @@ PIF-JSON-Generator/
 │   ├── check_releases.py          # Upstream release tag polling
 │   ├── generate_pifs.py           # Batch generator executor
 │   └── publish_release.py         # Release packager & asset uploader
+├── index.html                     # Live responsive release explorer dashboard
 ├── pyproject.toml                 # Modern PEP 621 / setuptools build config
 ├── requirements.txt               # Production & runtime dependencies
 ├── requirements-dev.txt           # Test & linting dependencies
