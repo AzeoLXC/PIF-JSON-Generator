@@ -20,6 +20,33 @@ logger = logging.getLogger(__name__)
 GENERATED_FILES_MANIFEST = Path("generated_files.txt")
 
 
+def _format_calver_tag(upstream_tag: str, repo_type: str) -> tuple[str, str, bool]:
+    """
+    Format standard CalVer release tag and title.
+    Example:
+      upstream_tag='20260716', repo_type='experimental'
+      -> tag: 'v2026.07.16-experimental'
+      -> name: 'Experimental PIF (v2026.07.16)'
+      -> prerelease: True
+    """
+    clean_tag = upstream_tag.lstrip("v")
+    if len(clean_tag) == 8 and clean_tag.isdigit():
+        formatted_date = f"{clean_tag[:4]}.{clean_tag[4:6]}.{clean_tag[6:]}"
+    else:
+        formatted_date = clean_tag
+
+    if repo_type.lower() == "experimental":
+        tag = f"v{formatted_date}-experimental"
+        name = f"Experimental PIF — {formatted_date}"
+        is_prerelease = True
+    else:
+        tag = f"v{formatted_date}"
+        name = f"Stable PIF — {formatted_date}"
+        is_prerelease = False
+
+    return tag, name, is_prerelease
+
+
 def publish_release(
     repo_name: str,
     upstream_tag: str,
@@ -34,15 +61,18 @@ def publish_release(
     client = Github(auth=Auth.Token(token))
     repo   = client.get_repo(repo_name)
 
-    release_tag  = f"{repo_type}-pif-{upstream_tag}"
-    release_name = f"{repo_type.capitalize()} PIF — {upstream_tag}"
+    release_tag, release_name, is_prerelease = _format_calver_tag(upstream_tag, repo_type)
+
     release_body = (
-        f"Auto-generated {len(file_paths)} PIF JSON file(s).\n"
-        f"Source tag: `{upstream_tag}`  |  "
-        f"Generated: {datetime.now(UTC).strftime('%Y-%m-%d')}"
+        f"### Play Integrity Fix JSON Artifacts\n\n"
+        f"- **Channel:** `{repo_type.capitalize()}`\n"
+        f"- **Upstream Source Tag:** `{upstream_tag}`\n"
+        f"- **Total JSON Files:** `{len(file_paths)}`\n"
+        f"- **Generated At:** `{datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}`\n\n"
+        f"Download the appropriate JSON property file for your device and module configuration."
     )
 
-    release = _get_or_create_release(repo, release_tag, release_name, release_body)
+    release = _get_or_create_release(repo, release_tag, release_name, release_body, is_prerelease)
 
     existing_assets: dict[str, Any] = {
         asset.name: asset for asset in release.get_assets()
@@ -66,7 +96,6 @@ def publish_release(
             skipped += 1
             continue
 
-        # If forced and asset exists, delete old asset first to overwrite cleanly
         if force and filepath.name in existing_assets:
             logger.info("Force check active — replacing existing asset: %s", filepath.name)
             try:
@@ -91,15 +120,25 @@ def publish_release(
         sys.exit(1)
 
 
-def _get_or_create_release(repo, tag: str, name: str, body: str):
+def _get_or_create_release(repo: Any, tag: str, name: str, body: str, prerelease: bool) -> Any:
     try:
-        release = repo.create_git_release(tag=tag, name=name, message=body)
-        logger.info("Created release: %s", tag)
+        release = repo.create_git_release(
+            tag=tag,
+            name=name,
+            message=body,
+            prerelease=prerelease,
+        )
+        logger.info("Created release: %s (prerelease=%s)", tag, prerelease)
         return release
     except GithubException as exc:
         if exc.status == 422:
             release = repo.get_release(tag)
             logger.info("Release already exists, reusing: %s", tag)
+            # Ensure prerelease and name are synchronized
+            try:
+                release.update_release(name=name, message=body, prerelease=prerelease)
+            except Exception:
+                pass
             return release
         raise
 
