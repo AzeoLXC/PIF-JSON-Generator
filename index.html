@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Play Integrity Fix (PIF) JSON Releases</title>
+  <meta name="description" content="Automated, verified Play Integrity Fix (PIF) JSON configurations for Stable & Experimental Android firmware releases.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: '#3b82f6',
+            darkbg: '#090a0f',
+            cardbg: '#12151e',
+            bordercol: '#1e2330'
+          },
+          fontFamily: {
+            mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+            sans: ['Inter', 'system-ui', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background-color: #090a0f; color: #e2e8f0; }
+    .glass-card { background: #12151e; border: 1px solid #1e2330; }
+    .badge-stable { background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); }
+    .badge-exp { background: rgba(245, 158, 11, 0.1); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.2); }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans antialiased selection:bg-blue-500 selection:text-white">
+
+  <!-- Header -->
+  <header class="border-b border-[#1e2330] bg-[#0c0e14]/80 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/20">⚡</div>
+        <div>
+          <h1 class="font-bold text-sm tracking-wide text-white">PIF JSON Generator</h1>
+          <p class="text-xs text-gray-400">Play Integrity Fix Automated Repository</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-4">
+        <a href="https://github.com/AzeoLXC/PIF-JSON-Generator" target="_blank" class="text-xs bg-[#1e2330] hover:bg-[#282f42] text-gray-200 px-3 py-1.5 rounded-md transition flex items-center space-x-1.5 border border-gray-700/50">
+          <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          <span>GitHub</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <main class="max-w-6xl mx-auto px-4 py-8 flex-1 w-full space-y-8">
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-[#1e2330] pb-6">
+      <div>
+        <h2 class="text-2xl font-bold text-white tracking-tight">Live Release Dashboard</h2>
+        <p class="text-sm text-gray-400 mt-1">Real-time automated PIF properties compiled directly from verified Android build releases.</p>
+      </div>
+      <div id="last-updated" class="text-xs font-mono text-gray-500 bg-[#12151e] px-3 py-1.5 rounded-md border border-[#1e2330]">
+        Syncing with GitHub API...
+      </div>
+    </div>
+
+    <!-- Release Containers Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      
+      <!-- Stable Release Column -->
+      <section class="space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold badge-stable">🟢 STABLE</span>
+            <h3 class="font-bold text-gray-200 text-base" id="stable-title">Loading Stable...</h3>
+          </div>
+          <span class="text-xs text-gray-400 font-mono" id="stable-tag"></span>
+        </div>
+
+        <div id="stable-card" class="glass-card rounded-xl p-5 space-y-4 shadow-xl">
+          <div class="animate-pulse space-y-3">
+            <div class="h-4 bg-gray-800 rounded w-3/4"></div>
+            <div class="h-8 bg-gray-800 rounded"></div>
+            <div class="h-20 bg-gray-800 rounded"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Experimental Release Column -->
+      <section class="space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold badge-exp">🧪 EXPERIMENTAL</span>
+            <h3 class="font-bold text-gray-200 text-base" id="exp-title">Loading Experimental...</h3>
+          </div>
+          <span class="text-xs text-gray-400 font-mono" id="exp-tag"></span>
+        </div>
+
+        <div id="exp-card" class="glass-card rounded-xl p-5 space-y-4 shadow-xl">
+          <div class="animate-pulse space-y-3">
+            <div class="h-4 bg-gray-800 rounded w-3/4"></div>
+            <div class="h-8 bg-gray-800 rounded"></div>
+            <div class="h-20 bg-gray-800 rounded"></div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-[#1e2330] py-6 text-center text-xs text-gray-500 font-mono">
+    <p>Maintained by <a href="https://github.com/AzeoLXC" class="text-blue-400 hover:underline">AzeoLXC</a> • Automated via GitHub Actions</p>
+  </footer>
+
+  <!-- Application Logic -->
+  <script>
+    const REPO = 'AzeoLXC/PIF-JSON-Generator';
+
+    async function fetchReleases() {
+      try {
+        const res = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=20`);
+        const releases = await res.json();
+
+        const stable = releases.find(r => r.tag_name.toLowerCase().includes('stable') || !r.prerelease);
+        const exp = releases.find(r => r.tag_name.toLowerCase().includes('exp') || r.prerelease);
+
+        document.getElementById('last-updated').innerText = `Live Connected • ${new Date().toLocaleTimeString()}`;
+
+        if (stable) renderRelease(stable, 'stable');
+        if (exp) renderRelease(exp, 'exp');
+
+      } catch (err) {
+        console.error('Failed to fetch releases:', err);
+        document.getElementById('last-updated').innerText = 'API Fetch Error';
+      }
+    }
+
+    async function renderRelease(rel, type) {
+      document.getElementById(`${type}-title`).innerText = rel.name || rel.tag_name;
+      document.getElementById(`${type}-tag`).innerText = rel.tag_name;
+
+      const card = document.getElementById(`${type}-card`);
+      const date = new Date(rel.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+
+      let html = `
+        <div class="border-b border-[#1e2330] pb-3 mb-4 flex justify-between items-center text-xs text-gray-400">
+          <span>Published: <strong class="text-gray-200">${date}</strong></span>
+          <span>Assets: <strong class="text-gray-200">${rel.assets.length} JSON files</strong></span>
+        </div>
+        <div class="space-y-3 max-h-[520px] overflow-y-auto pr-1">
+      `;
+
+      if (rel.assets.length === 0) {
+        html += `<p class="text-xs text-gray-500 italic">No JSON assets attached to this release.</p>`;
+      } else {
+        for (const asset of rel.assets) {
+          const sizeKb = (asset.size / 1024).toFixed(1);
+          const parsed = parseAssetFilename(asset.name);
+
+          html += `
+            <div class="p-3 bg-[#0c0e14] rounded-lg border border-[#1e2330] hover:border-blue-500/50 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div class="space-y-1 min-w-0">
+                <div class="flex items-center space-x-2">
+                  <span class="text-sm font-bold text-white truncate">${parsed.model || parsed.codename}</span>
+                  <span class="text-[10px] font-mono bg-blue-950/80 text-blue-400 px-1.5 py-0.5 rounded border border-blue-800/40">${parsed.codename}</span>
+                </div>
+                <div class="text-[11px] font-mono text-gray-400 truncate">
+                  Build: <span class="text-gray-300">${parsed.buildId}</span> • Size: ${sizeKb} KB
+                </div>
+              </div>
+              <a href="${asset.browser_download_url}" class="shrink-0 text-xs bg-blue-600 hover:bg-blue-500 text-white font-medium px-3 py-2 rounded-md flex items-center justify-center space-x-1 transition shadow-sm">
+                <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 20 20"><path d="M13 8V2H7v6H2l8 8 8-8h-5zM0 18h20v2H0v-2z"/></svg>
+                <span>Download JSON</span>
+              </a>
+            </div>
+          `;
+        }
+      }
+
+      html += `</div>`;
+      card.innerHTML = html;
+    }
+
+    function parseAssetFilename(name) {
+      // Format example: stable_pif_Blazer_CP2A.260705.006.json
+      const clean = name.replace('.json', '');
+      const parts = clean.split('_');
+      
+      let codename = 'Android';
+      let buildId = 'Latest';
+
+      if (parts.length >= 3) {
+        codename = parts[2];
+        buildId = parts.slice(3).join('_') || 'Build';
+      }
+
+      return {
+        codename: codename.charAt(0).toUpperCase() + codename.slice(1),
+        buildId: buildId,
+        model: codename
+      };
+    }
+
+    fetchReleases();
+  </script>
+</body>
+</html>
