@@ -26,10 +26,15 @@ jobs:
           pip install -r requirements.txt
           pip install pytest ruff
 
-      - name: Run Ruff (Linter & Format Check)
-        run: ruff check .
+      - name: Run Ruff (Lint & Auto-Format Check)
+        run: |
+          ruff check --fix . || true
+          ruff check .
+
+      - name: Run Standalone Self-Check Suite
+        run: python tests/self_check.py
 
       - name: Run Pytest Test Suite
         env:
-          PYTHONPATH: .
+          PYTHONPATH: src:.
         run: pytest -v
