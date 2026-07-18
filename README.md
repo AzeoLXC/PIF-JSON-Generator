@@ -1,117 +1,141 @@
 # PIF JSON Generator
 
+[![CI Checks & Tests](https://github.com/AzeoLXC/PIF-JSON-Generator/actions/workflows/ci.yml/badge.svg)](https://github.com/AzeoLXC/PIF-JSON-Generator/actions/workflows/ci.yml)
 [![Auto-Generate PIF JSON Files](https://github.com/AzeoLXC/PIF-JSON-Generator/actions/workflows/auto_generate.yml/badge.svg)](https://github.com/AzeoLXC/PIF-JSON-Generator/actions/workflows/auto_generate.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
-Automated generator of **Play Integrity Fix (PIF) JSON** property files from the latest Android build-property releases. New upstream releases are detected every 6 hours via GitHub Actions; JSON files are generated and attached to a GitHub release automatically.
-
----
-
-## Features
-
-- Supports **two output formats**:
-  - `legacy` — 8-field format (original PIF spec)
-  - `extended` *(default)* — 19-field format with spoofing flags
-- Property resolution follows **strict source priority** (e.g. `system_ext` → `system` → generic)
-- Security patch date is **derived automatically** from the build ID when not explicitly set
-- Full field **validation** before any file is written
-- Runs fully **unattended** via GitHub Actions on a 6-hour schedule
+Automated, resilient generator for **Play Integrity Fix (PIF) JSON** configuration files parsed directly from Android `system.prop` releases. Built with native retry backoffs, strict field validation, and automated CI/CD lifecycle workflows.
 
 ---
 
-## Project Structure
+## Key Highlights
+
+- 🛡️ **Resilient Network Adapter:** Engineered with `urllib3.util.Retry` exponential backoff (automatic recovery on `429`, `500`, `502`, `503`, and `504` HTTP status codes).
+- ⚙️ **Dual Output Architectures:**
+  - `extended` *(default)* — 19-field modern format with granular spoofing flags.
+  - `legacy` — 8-field classic format for older PIF modules.
+- 🧪 **Enterprise CI Pipeline:** Automated linting via `ruff`, full test suites via `pytest`, running on modern Node.js 24 native GitHub Action runners.
+- 🔍 **Strict Schema Validation:** Automated parsing of API levels, security patch formats (`YYYY-MM-DD`), and build metadata before release.
+- 🤖 **Zero-Touch Automation:** Runs unattended via GitHub Actions to sync, parse, validate, and publish releases.
+
+---
+
+## Architecture & Project Structure
 
 ```
 PIF-JSON-Generator/
 ├── .github/
 │   └── workflows/
-│       └── auto_generate.yml   # CI/CD: detect → generate → publish
+│       ├── ci.yml                 # CI: Ruff linter & Pytest suite
+│       └── auto_generate.yml      # CD: Upstream watcher & release publisher
 ├── src/
 │   └── pif_generator/
-│       ├── __init__.py          # Public API surface
-│       ├── core.py              # PIFGenerator class
-│       └── constants.py         # Property key lists, repo config, validation rules
+│       ├── __init__.py            # Package root & public exports
+│       ├── core.py                # PIFGenerator core engine (Session + Retry)
+│       └── constants.py           # Target props, schema definitions & fallbacks
+├── tests/
+│   ├── test_generator.py          # Pytest unit & mock integration tests
+│   └── self_check.py              # Zero-dependency standalone verification
 ├── scripts/
-│   ├── check_releases.py        # Query upstream repos for new releases
-│   ├── generate_pifs.py         # Batch-generate PIF JSON from asset list
-│   └── publish_release.py       # Create GitHub release & upload assets
-├── pyproject.toml
-├── requirements.txt
-└── LICENSE
+│   ├── check_releases.py          # Upstream release tag polling
+│   ├── generate_pifs.py           # Batch generator executor
+│   └── publish_release.py         # Release packager & asset uploader
+├── pyproject.toml                 # Modern PEP 621 / setuptools build config
+├── requirements.txt               # Production & runtime dependencies
+├── requirements-dev.txt           # Test & linting dependencies
+└── LICENSE                        # MIT License
 ```
 
 ---
 
-## How It Works
+## Pipeline Workflow
 
 ```
-GitHub Actions (every 6 h)
-        │
-        ▼
-check_releases.py   ── queries Pixel-Props & Elcapitanoe repos
-        │                for the latest release tag
-        │  new tag found?
-        ▼
-generate_pifs.py    ── downloads each ZIP, extracts system.prop,
-        │                builds & validates PIF JSON
-        ▼
-publish_release.py  ── creates a GitHub release on this repo
-        │                and uploads all generated JSON files
-        ▼
-git commit          ── persists the processed tag so the same
-                         release is never processed twice
+[ Scheduled CRON / Dispatch ]
+             │
+             ▼
+    check_releases.py       ── Query monitored upstream repos for new tags
+             │
+             ├─ (No new tag)  ── Terminate clean
+             │
+             ▼ (New tag detected)
+     generate_pifs.py       ── Stream ZIPs via resilient retry session
+             │              ── Extract system.prop in-memory
+             │              ── Parse, transform & validate JSON schema
+             ▼
+    publish_release.py      ── Package artifacts & publish GitHub Release
+             │
+             ▼
+       [ Git Sync ]         ── Persist processed release state tag
 ```
 
 ---
 
-## Monitored Upstream Repositories
+## Local Development & Testing
 
-| Type           | Repository                                                        |
-|----------------|-------------------------------------------------------------------|
-| `stable`       | [Pixel-Props/build.prop](https://github.com/Pixel-Props/build.prop) |
-| `experimental` | [Elcapitanoe/Build-Prop-BETA](https://github.com/Elcapitanoe/Build-Prop-BETA) |
-
----
-
-## Local Usage
-
-### Prerequisites
+### 1. Installation
 
 ```bash
+# Clone the repository
+git clone git@github.com:AzeoLXC/PIF-JSON-Generator.git
+cd PIF-JSON-Generator
+
+# Install dependencies in editable mode
 pip install -r requirements.txt
+pip install -r requirements-dev.txt
+pip install -e .
 ```
 
-### Generate a single PIF (ad-hoc)
+### 2. Running Test Suites
+
+Run the automated `pytest` suite:
+```bash
+pytest -v tests/
+```
+
+Or run the standalone self-check script (zero external test dependencies):
+```bash
+python tests/self_check.py
+```
+
+### 3. Code Quality & Linting
+
+```bash
+ruff check .
+```
+
+---
+
+## Programmatic Usage
 
 ```python
+from pathlib import Path
 from src.pif_generator import PIFGenerator
 
-generator = PIFGenerator(repo_type="stable", output_format="extended")
-output = generator.generate("pixel_9_ap4a.zip", "https://example.com/pixel_9_ap4a.zip")
-print(f"Written → {output}")
-```
+# Initialize generator with custom parameters
+generator = PIFGenerator(
+    repo_type="stable",
+    output_format="extended",
+    output_dir=Path("./output"),
+    http_timeout=120,
+)
 
-### Run the full pipeline manually
+# Download, extract system.prop, validate and persist PIF JSON
+output_path = generator.generate(
+    zip_name="pixel_9_pro.zip",
+    url="https://example.com/builds/pixel_9_pro.zip",
+)
 
-```bash
-export GITHUB_TOKEN="ghp_..."
-
-# 1. Check for new releases
-python scripts/check_releases.py
-
-# 2. Generate PIF files (replace with actual JSON from step 1)
-python scripts/generate_pifs.py '[{"name":"pixel_9.zip","url":"https://..."}]' stable
-
-# 3. Publish release
-python scripts/publish_release.py owner/repo v2025-10-05 stable
+print(f"Generated PIF JSON: {output_path}")
 ```
 
 ---
 
 ## Output Formats
 
-### Extended (default)
+### Extended Format (Default)
 
 ```json
 {
@@ -137,7 +161,7 @@ python scripts/publish_release.py owner/repo v2025-10-05 stable
 }
 ```
 
-### Legacy
+### Legacy Format
 
 ```json
 {
@@ -154,12 +178,6 @@ python scripts/publish_release.py owner/repo v2025-10-05 stable
 
 ---
 
-## Credits
-
-- Build property data — [Pixel-Props/build.prop](https://github.com/Pixel-Props/build.prop)
-- Experimental firmware properties — [Elcapitanoe/Build-Prop-BETA](https://github.com/Elcapitanoe/Build-Prop-BETA)
-- Workflow and tooling — Prateek Maru, 2025
-
 ## License
 
-Released under the [MIT License](LICENSE).
+This project is licensed under the [MIT License](LICENSE).
