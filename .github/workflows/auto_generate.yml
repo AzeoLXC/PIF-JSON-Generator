@@ -26,6 +26,8 @@ jobs:
   check-releases:
     name: Check for New Releases
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       new_release: ${{ steps.check.outputs.new_release }}
       results: ${{ steps.check.outputs.results }}
@@ -58,6 +60,8 @@ jobs:
     needs: check-releases
     if: needs.check-releases.outputs.new_release == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     strategy:
       max-parallel: 1          # Sequential to avoid git-push race conditions
@@ -69,8 +73,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          # Fetch full history so we can push commits cleanly
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -104,6 +108,7 @@ jobs:
       # ---- Update state ------------------------------------------------------
       - name: Commit updated release-tag file
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO_TYPE: ${{ matrix.result.repo_type }}
           UPSTREAM_TAG: ${{ matrix.result.latest_tag }}
         run: |
@@ -116,7 +121,6 @@ jobs:
 
           git add "last_release_${REPO_TYPE}_tag.txt"
 
-          # Only commit if there is an actual change
           if git diff --staged --quiet; then
             echo "Tag file unchanged — nothing to commit"
           else
