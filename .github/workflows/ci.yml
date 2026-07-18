@@ -23,8 +23,9 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -e .
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install .
 
       - name: Run Standalone Self-Check Suite
         run: python tests/self_check.py
