@@ -2,11 +2,12 @@ import io
 import json
 import zipfile
 from pathlib import Path
-from typing import Any
+import pytest
 
 from pif_generator import PIFGenerator
 
 
+@pytest.fixture
 def sample_props_content() -> str:
     return """
 ro.build.id=UP1A.231005.007
@@ -24,10 +25,11 @@ ro.build.version.release=14
 """
 
 
-def mock_zip_bytes(content: str) -> bytes:
+@pytest.fixture
+def mock_zip_bytes(sample_props_content: str) -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr("system.prop", content)
+        zf.writestr("system.prop", sample_props_content)
     return buffer.getvalue()
 
 
@@ -41,16 +43,16 @@ class MockResponse:
             raise RuntimeError(f"HTTP {self.status_code}")
 
 
-def test_parse_system_prop(sample: str) -> None:
-    props = PIFGenerator._parse_system_prop(sample)
+def test_parse_system_prop(sample_props_content: str) -> None:
+    props = PIFGenerator._parse_system_prop(sample_props_content)
     assert props["ro.build.id"] == "UP1A.231005.007"
     assert props["ro.product.model"] == "Pixel 7 Pro"
     assert props["ro.product.brand"] == "google"
 
 
-def test_build_extended_pif(sample: str, tmp_path: Path) -> None:
+def test_build_extended_pif(sample_props_content: str, tmp_path: Path) -> None:
     generator = PIFGenerator(repo_type="stable", output_format="extended", output_dir=tmp_path)
-    props = generator._parse_system_prop(sample)
+    props = generator._parse_system_prop(sample_props_content)
     pif = generator._build_extended_pif(props)
 
     assert pif["ID"] == "UP1A.231005.007"
@@ -62,9 +64,9 @@ def test_build_extended_pif(sample: str, tmp_path: Path) -> None:
     assert pif["spoofBuild"] == "1"
 
 
-def test_build_legacy_pif(sample: str, tmp_path: Path) -> None:
+def test_build_legacy_pif(sample_props_content: str, tmp_path: Path) -> None:
     generator = PIFGenerator(repo_type="stable", output_format="legacy", output_dir=tmp_path)
-    props = generator._parse_system_prop(sample)
+    props = generator._parse_system_prop(sample_props_content)
     pif = generator._build_legacy_pif(props)
 
     assert pif["MANUFACTURER"] == "Google"
@@ -73,11 +75,11 @@ def test_build_legacy_pif(sample: str, tmp_path: Path) -> None:
     assert pif["SECURITY_PATCH"] == "2023-10-05"
 
 
-def test_generate_from_zip(mock_zip: bytes, tmp_path: Path, monkeypatch: Any) -> None:
+def test_generate_from_zip(mock_zip_bytes: bytes, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     generator = PIFGenerator(repo_type="stable", output_format="extended", output_dir=tmp_path)
 
     # Mock HTTP session get
-    monkeypatch.setattr(generator.session, "get", lambda url, timeout: MockResponse(mock_zip))
+    monkeypatch.setattr(generator.session, "get", lambda url, timeout: MockResponse(mock_zip_bytes))
 
     out_file = generator.generate("cheetah.zip", "https://example.com/cheetah.zip")
     assert out_file.exists()
@@ -92,8 +94,5 @@ def test_validation_missing_field(tmp_path: Path) -> None:
     invalid_props = "ro.build.id=TEST\n"  # missing fingerprint
 
     props = generator._parse_system_prop(invalid_props)
-    try:
+    with pytest.raises(ValueError, match="No fingerprint found"):
         generator._build_extended_pif(props)
-        raise AssertionError("Validation should have failed")
-    except ValueError as exc:
-        assert "No fingerprint found" in str(exc)
