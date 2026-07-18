@@ -7,6 +7,7 @@ import os
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from github import Auth, Github, GithubException
 
@@ -43,9 +44,11 @@ def publish_release(
 
     release = _get_or_create_release(repo, release_tag, release_name, release_body)
 
-    existing_assets: dict[str, object] = {
+    existing_assets: dict[str, Any] = {
         asset.name: asset for asset in release.get_assets()
     }
+
+    force = os.environ.get("FORCE_CHECK", "false").lower() == "true"
 
     uploaded = 0
     skipped  = 0
@@ -58,10 +61,18 @@ def publish_release(
             logger.warning("File not found, skipping: %s", filepath)
             continue
 
-        if filepath.name in existing_assets:
+        if not force and filepath.name in existing_assets:
             logger.info("Already uploaded, skipping: %s", filepath.name)
             skipped += 1
             continue
+
+        # If forced and asset exists, delete old asset first to overwrite cleanly
+        if force and filepath.name in existing_assets:
+            logger.info("Force check active — replacing existing asset: %s", filepath.name)
+            try:
+                existing_assets[filepath.name].delete_asset()
+            except Exception as e:
+                logger.warning("Could not delete old asset %s: %s", filepath.name, e)
 
         try:
             logger.info("Uploading %s …", filepath.name)
