@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Any
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
 
 from .constants import (
     BRAND_KEY_LEGACY,
@@ -62,6 +64,18 @@ class PIFGenerator:
         self.http_timeout = http_timeout
         self._prefix = OUTPUT_PREFIX[repo_type]
 
+        # Resilient HTTP session with exponential backoff retry
+        self.session = requests.Session()
+        retries = Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+            raise_on_status=False,
+        )
+        adapter = HTTPAdapter(max_retries=retries)
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
+
     def generate(self, zip_name: str, url: str) -> Path:
         raw_content = self._download_and_extract(url)
         props = self._parse_system_prop(raw_content)
@@ -94,7 +108,7 @@ class PIFGenerator:
 
     def _download_and_extract(self, url: str) -> str:
         logger.info("Downloading %s", url)
-        response = requests.get(url, timeout=self.http_timeout)
+        response = self.session.get(url, timeout=self.http_timeout)
         response.raise_for_status()
 
         with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
