@@ -183,23 +183,72 @@
       card.innerHTML = html;
     }
 
+    const CODENAME_MAP = {
+      sailfish: "Pixel",
+      marlin: "Pixel XL",
+      walleye: "Pixel 2",
+      taimen: "Pixel 2 XL",
+      blueline: "Pixel 3",
+      crosshatch: "Pixel 3 XL",
+      sargo: "Pixel 3a",
+      bonito: "Pixel 3a XL",
+      flame: "Pixel 4",
+      coral: "Pixel 4 XL",
+      sunfish: "Pixel 4a",
+      bramble: "Pixel 4a 5G",
+      redfin: "Pixel 5",
+      barbet: "Pixel 5a",
+      oriole: "Pixel 6",
+      raven: "Pixel 6 Pro",
+      bluejay: "Pixel 6a",
+      panther: "Pixel 7",
+      cheetah: "Pixel 7 Pro",
+      lynx: "Pixel 7a",
+      felix: "Pixel Fold",
+      shiba: "Pixel 8",
+      husky: "Pixel 8 Pro",
+      akita: "Pixel 8a",
+      tokay: "Pixel 9",
+      caiman: "Pixel 9 Pro",
+      komodo: "Pixel 9 Pro XL",
+      comet: "Pixel 9 Pro Fold",
+      tegu: "Pixel 9a",
+      frankel: "Pixel 10",
+      blazer: "Pixel 10 Pro",
+      mustang: "Pixel 10 Pro XL",
+      rango: "Pixel 10 Pro Fold",
+      stallion: "Pixel 10a",
+      cubs: "Pixel 11",
+      grizzly: "Pixel 11 Pro",
+      kodiak: "Pixel 11 Pro XL",
+      yogi: "Pixel 11 Pro Fold",
+      galago: "Pixel 12",
+      sasquatch: "Pixel 12 Pro",
+      silverback: "Pixel 12 Pro XL",
+      capuchin: "Pixel 12 Pro Fold"
+    };
+
     function parseAssetFilename(name) {
       // Format example: stable_pif_Blazer_CP2A.260705.006.json
       const clean = name.replace('.json', '');
       const parts = clean.split('_');
       
-      let codename = 'Android';
+      let rawCodename = 'Android';
       let buildId = 'Latest';
 
       if (parts.length >= 3) {
-        codename = parts[2];
+        rawCodename = parts[2];
         buildId = parts.slice(3).join('_') || 'Build';
       }
 
+      const lookupKey = rawCodename.toLowerCase();
+      const marketingName = CODENAME_MAP[lookupKey] || (rawCodename.charAt(0).toUpperCase() + rawCodename.slice(1));
+      const displayCodename = rawCodename.charAt(0).toUpperCase() + rawCodename.slice(1);
+
       return {
-        codename: codename.charAt(0).toUpperCase() + codename.slice(1),
+        codename: displayCodename,
         buildId: buildId,
-        model: codename
+        model: marketingName
       };
     }
 
